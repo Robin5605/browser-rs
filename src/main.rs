@@ -6,6 +6,7 @@ use std::path::Path;
 use std::{io, time::Duration, thread};
 use std::fs;
 
+use crossterm::event::poll;
 use crossterm::{terminal::{enable_raw_mode, EnterAlternateScreen, disable_raw_mode, LeaveAlternateScreen}, execute, event::{EnableMouseCapture, DisableMouseCapture, read, Event, KeyCode}};
 use document::{Document};
 use document_viewer::DocumentViewer;
@@ -46,47 +47,63 @@ fn main() -> Result<(), io::Error> {
     let mut document_viewer = DocumentViewer::new(String::default());
     let tickrate = Duration::ZERO;
     loop {
-        if let Event::Key(key) = read()? {
-            match key.code {
-                KeyCode::Char('q') => break,
-                KeyCode::Down => {
-                    stateful_table.next();
-                    document_viewer.get_mut_state().set_offset(0);
-                },
-                KeyCode::Up => {
-                    stateful_table.prev();
-                    document_viewer.get_mut_state().set_offset(0);
-                },
-                KeyCode::Enter => {
-                    let is_dir = stateful_table.get_selected().path().is_dir();
-                    if is_dir {
-                        stateful_table.set_items(get_files(&stateful_table.get_selected().path()))
-                    }
-                },
-                KeyCode::Backspace => {
-                    let current_path = stateful_table.get_selected().path().canonicalize().unwrap();
-                    /* 
-                    We need to get the "grandparent" directory because `.parent()` actually
-                    only returns the current directory the first time around.
-                    For instance, if the list is pointed ./src/main.rs and we use `.parent()` it would
-                    return `./src`, and getting the contents of that directory is the same as the
-                    directory we're already in. So we need to get the parent of `./src/main.rs`, then
-                    get the parent again, which results in `./`.
-                    
-                    */
-                    if let Some(current_dir) = current_path.parent() {
-                        if let Some(parent_dir) = current_dir.parent() {
-                            let entries = get_files(parent_dir);
-                            stateful_table.set_items(entries);
+        if poll(tickrate)? {
+            match read()? {
+                Event::Key(key) => {
+                    match key.code {
+                        KeyCode::Char('q') => break,
+                        KeyCode::Down => {
+                            stateful_table.next();
+                            document_viewer.get_mut_state().set_offset(0);
+                        },
+                        KeyCode::Up => {
+                            stateful_table.prev();
+                            document_viewer.get_mut_state().set_offset(0);
+                        },
+                        KeyCode::Enter => {
+                            let is_dir = stateful_table.get_selected().path().is_dir();
+                            if is_dir {
+                                stateful_table.set_items(get_files(&stateful_table.get_selected().path()))
+                            }
+                        },
+                        KeyCode::Backspace => {
+                            let current_path = stateful_table.get_selected().path().canonicalize().unwrap();
+                            /* 
+                            We need to get the "grandparent" directory because `.parent()` actually
+                            only returns the current directory the first time around.
+                            For instance, if the list is pointed ./src/main.rs and we use `.parent()` it would
+                            return `./src`, and getting the contents of that directory is the same as the
+                            directory we're already in. So we need to get the parent of `./src/main.rs`, then
+                            get the parent again, which results in `./`.
+                            
+                            */
+                            if let Some(current_dir) = current_path.parent() {
+                                if let Some(parent_dir) = current_dir.parent() {
+                                    let entries = get_files(parent_dir);
+                                    stateful_table.set_items(entries);
+                                }
+                            }
+                        },
+                        KeyCode::PageDown => {
+                            document_viewer.scroll_down();
+                        },
+                        KeyCode::PageUp => {
+                            document_viewer.scroll_up();
                         }
+                        _ => {}
                     }
                 },
-                KeyCode::PageDown => {
-                    document_viewer.scroll_down();
+                Event::Mouse(mouse) => {
+                    match mouse.kind {
+                        crossterm::event::MouseEventKind::ScrollDown => {
+                            document_viewer.scroll_down();
+                        },
+                        crossterm::event::MouseEventKind::ScrollUp => {
+                            document_viewer.scroll_up()
+                        },
+                        _ => {}
+                    }
                 },
-                KeyCode::PageUp => {
-                    document_viewer.scroll_up();
-                }
                 _ => {}
             }
         }
