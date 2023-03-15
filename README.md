@@ -1,3 +1,6 @@
+# NOTICE
+This application has now been archived. A rewrite of this application is now being worked on as the [Blaze Project](https://github.com/Robin5605/blaze)
+
 # browser-rs
 A basic file browser and viewer written in Rust
 
